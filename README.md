@@ -2,6 +2,8 @@
 
 A high-fidelity Python implementation for parsing and decoding 1090 MHz Mode S Extended Squitter (ADS-B) messages. This repository contains modules for CRC validation, spatial decoding using the Compact Position Reporting (CPR) algorithm, and vector velocity decomposition.
 
+### [**Live Visualiser Demo**](https://ads-b-signal-decoder-visualiser.vercel.app/)
+
 ![ADS-B Visualiser Dashboard](screenshot.png)
 
 *Interactive flight telemetry and map dashboard decoding real-time transponder signals.*
