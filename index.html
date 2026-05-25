@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADS-B Signal Decoder & Visualiser</title>
+    
+    <!-- Google Fonts & Leaflet CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <style>
+        :root {
+            --bg-color: #0A0E13;
+            --panel-bg: #0A0E13;
+            --border-color: #1E2530;
+            --accent-color: #00A8E8;
+            --text-main: #D4D8DD;
+            --text-muted: #6B7280;
+            --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--bg-color);
+            border-bottom: 1px solid var(--border-color);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+
+        header h1 {
+            font-family: var(--font-sans);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.15em;
+            color: var(--text-main);
+        }
+
+        header .status {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--text-muted);
+            letter-spacing: 0.05em;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 45px);
+            overflow: hidden;
+        }
+
+        /* Sidebar Control Panel (Fixed 320px Width) */
+        .sidebar {
+            width: 320px;
+            min-width: 320px;
+            max-width: 320px;
+            background-color: var(--bg-color);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            gap: 20px;
+            overflow-y: auto;
+            z-index: 90;
+        }
+
+        .section-title {
+            font-family: var(--font-sans);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--accent-color);
+            border-left: 3px solid var(--accent-color);
+            padding-left: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 8px;
+            font-family: var(--font-sans);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+
+        .tab-btn.active {
+            background-color: #0F1923;
+            border-color: var(--border-color);
+            border-bottom: 2px solid var(--accent-color);
+            color: var(--accent-color);
+        }
+
+        .tab-content {
+            display: none;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .form-group label {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .form-group input {
+            background-color: #060A0F;
+            border: 1px solid var(--border-color);
+            padding: 8px 10px;
+            border-radius: 0px;
+            color: var(--text-main);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-color);
+        }
+
+        .btn-decode {
+            background-color: #0F1923;
+            border: 1px solid var(--accent-color);
+            color: var(--accent-color);
+            padding: 10px;
+            border-radius: 2px;
+            font-family: var(--font-sans);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            margin-top: 5px;
+        }
+
+        .btn-decode:hover {
+            background-color: #162332;
+        }
+
+        /* Flight Stats Panel - Leader Dots Layout */
+        .stats-panel {
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            flex-shrink: 0;
+        }
+
+        .stat-leader {
+            flex-grow: 1;
+            border-bottom: 1px dotted var(--border-color);
+            margin: 0 6px;
+            align-self: flex-end;
+            margin-bottom: 3px;
+        }
+
+        .stat-val {
+            font-size: 12px;
+            font-weight: 700;
+            font-family: var(--font-mono);
+            color: var(--text-main);
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        /* Map and Instruments Section */
+        .workspace {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        #map {
+            flex: 1;
+            background-color: #070913;
+        }
+
+        /* HUD Instruments Layer */
+        .hud-layer {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            height: 180px;
+            display: flex;
+            gap: 15px;
+            pointer-events: none;
+            z-index: 80;
+        }
+
+        .instrument {
+            flex: 1;
+            background: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: 2px;
+            padding: 10px;
+            backdrop-filter: none;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .instrument-title {
+            position: absolute;
+            top: 8px;
+            left: 12px;
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+        }
+
+        .instrument canvas {
+            margin-top: 15px;
+        }
+
+        .digital-readout {
+            position: absolute;
+            bottom: 8px;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        /* Leaflet Popup customization overrides */
+        .leaflet-popup-content-wrapper {
+            background: var(--bg-color) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 0px !important;
+            font-family: var(--font-mono) !important;
+            font-size: 11px !important;
+            box-shadow: none !important;
+        }
+        .leaflet-popup-content {
+            margin: 10px 12px !important;
+        }
+        .leaflet-popup-tip {
+            background: var(--bg-color) !important;
+            border-left: 1px solid var(--border-color) !important;
+            border-bottom: 1px solid var(--border-color) !important;
+            box-shadow: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>ADS-B SIGNAL DECODER & VISUALISER</h1>
+        <div class="status">ENGINE ACTIVE · PORT 8080</div>
+    </header>
+
+    <div class="main-container">
+        <!-- Control Panel Sidebar -->
+        <div class="sidebar">
+            <div>
+                <div class="section-title">Telemetry Input</div>
+                <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 15px;">
+                    Paste hex packets directly from an SDR feed.
+                </p>
+                
+                <div class="tabs">
+                    <button class="tab-btn active" onclick="switchTab('position-tab')">Position (CPR)</button>
+                    <button class="tab-btn" onclick="switchTab('velocity-tab')">Velocity (TC19)</button>
+                </div>
+            </div>
+
+            <!-- Position Tab -->
+            <div id="position-tab" class="tab-content active">
+                <div class="form-group">
+                    <label for="even-msg">Even Message (F=0)</label>
+                    <input type="text" id="even-msg" value="8D75804B580FF2CF7E9BA6F701D0" placeholder="e.g. 8D75804B580FF2C...">
+                </div>
+                <div class="form-group">
+                    <label for="odd-msg">Odd Message (F=1)</label>
+                    <input type="text" id="odd-msg" value="8D75804B580FF6B283EB7A157117" placeholder="e.g. 8D75804B580FF6B...">
+                </div>
+                <button class="btn-decode" onclick="decodePosition()">Decode Position</button>
+            </div>
+
+            <!-- Velocity Tab -->
+            <div id="velocity-tab" class="tab-content">
+                <div class="form-group">
+                    <label for="vel-msg">Velocity Hex Message</label>
+                    <input type="text" id="vel-msg" value="8D75804B99006599200000000000" placeholder="e.g. 8D75804B990065...">
+                </div>
+                <button class="btn-decode" onclick="decodeVelocity()">Decode Velocity</button>
+            </div>
+
+            <!-- Stats/Telemetry Display Panel -->
+            <div class="stats-panel">
+                <div class="section-title" style="margin-bottom: 5px;">Decoded State Vector</div>
+                
+                <div class="stat-row">
+                    <span class="stat-label">ICAO Address</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-icao">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Position Lat/Lon</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-pos">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Baro Altitude</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-alt">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Horizontal Speed</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-speed">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Track / Heading</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-heading">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Vertical Speed</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-vs">N/A</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">GNSS/Baro Diff</span>
+                    <span class="stat-leader"></span>
+                    <span class="stat-val" id="val-diff">N/A</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Map & Avionics Hud -->
+        <div class="workspace">
+            <div id="map"></div>
+            
+            <div class="hud-layer">
+                <!-- Instrument 1: Compass / Track Indicator -->
+                <div class="instrument">
+                    <span class="instrument-title">Compass / Heading</span>
+                    <canvas id="compassCanvas" width="120" height="120"></canvas>
+                    <div class="digital-readout" id="compassReadout">---°</div>
+                </div>
+                
+                <!-- Instrument 2: Altimeter -->
+                <div class="instrument">
+                    <span class="instrument-title">Altitude Tape</span>
+                    <canvas id="altimeterCanvas" width="90" height="120"></canvas>
+                    <div class="digital-readout" id="altReadout">----- FT</div>
+                </div>
+                
+                <!-- Instrument 3: Airspeed Indicator -->
+                <div class="instrument">
+                    <span class="instrument-title">Airspeed Indicator</span>
+                    <canvas id="airspeedCanvas" width="120" height="120"></canvas>
+                    <div class="digital-readout" id="speedReadout">--- KT</div>
+                </div>
+                
+                <!-- Instrument 4: VSI (Vertical Speed Indicator) -->
+                <div class="instrument">
+                    <span class="instrument-title">Vertical Speed</span>
+                    <canvas id="vsiCanvas" width="90" height="120"></canvas>
+                    <div class="digital-readout" id="vsReadout">---- FPM</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS & App Script -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // Initialize Map
+        const map = L.map('map', {
+            zoomControl: false
+        }).setView([10.216, 123.889], 12);
+        
+        // Add CartoDB Dark Matter tile layer for premium dark-mode aesthetic
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }).addTo(map);
+        
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        let evenMarker = null;
+        let oddMarker = null;
+        let pathLine = null;
+
+        // Custom aircraft icon rotating dynamically - solid white, no transitions
+        const aircraftIcon = L.divIcon({
+            html: `<svg id="plane-svg" style="transform: rotate(0deg);" width="28" height="28" viewBox="0 0 24 24" fill="#FFFFFF"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L14 19v-5.5L21 16z"/></svg>`,
+            className: 'aircraft-div-icon',
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+        });
+
+        // Initialize Gauges
+        let currentHeading = 0;
+        let currentAltitude = 0;
+        let currentSpeed = 0;
+        let currentVS = 0;
+
+        function drawCompass(heading) {
+            const canvas = document.getElementById('compassCanvas');
+            const ctx = canvas.getContext('2d');
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = 45;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw outer dial ring - flat thin line
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0, 2 * Math.PI);
+            ctx.strokeStyle = '#1E2530';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Draw card ticks rotated
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(-heading * Math.PI / 180);
+
+            // Ticks every 30 deg
+            for (let angle = 0; angle < 360; angle += 10) {
+                ctx.beginPath();
+                if (angle % 30 === 0) {
+                    ctx.moveTo(0, -radius);
+                    ctx.lineTo(0, -radius + 6);
+                    ctx.strokeStyle = '#00A8E8'; // Accent
+                    ctx.lineWidth = 1;
+                    
+                    // Labels N, E, S, W
+                    ctx.save();
+                    ctx.translate(0, -radius + 14);
+                    ctx.rotate(-angle * Math.PI / 180); // Rotate back so text is upright relative to card
+                    ctx.fillStyle = '#D4D8DD';
+                    ctx.font = 'bold 8px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    let label = angle;
+                    if (angle === 0) label = 'N';
+                    if (angle === 90) label = 'E';
+                    if (angle === 180) label = 'S';
+                    if (angle === 270) label = 'W';
+                    ctx.fillText(label, 0, 0);
+                    ctx.restore();
+                } else {
+                    ctx.moveTo(0, -radius);
+                    ctx.lineTo(0, -radius + 3);
+                    ctx.strokeStyle = '#1E2530';
+                    ctx.lineWidth = 1;
+                }
+                ctx.stroke();
+                ctx.rotate(10 * Math.PI / 180);
+            }
+            ctx.restore();
+
+            // Draw stationary center airplane icon pointing Up - solid white
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.beginPath();
+            ctx.moveTo(0, -12);
+            ctx.lineTo(9, 4);
+            ctx.lineTo(2, 2);
+            ctx.lineTo(1, 8);
+            ctx.lineTo(4, 10);
+            ctx.lineTo(-4, 10);
+            ctx.lineTo(-1, 8);
+            ctx.lineTo(-2, 2);
+            ctx.lineTo(-9, 4);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawAltimeter(alt) {
+            const canvas = document.getElementById('altimeterCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw vertical scale axis line
+            ctx.strokeStyle = '#1E2530';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(50, 5);
+            ctx.lineTo(50, 115);
+            ctx.stroke();
+
+            // Draw moving tape scale ticks and numbers
+            const scaleFactor = 0.15; // pixels per foot
+            ctx.fillStyle = '#6B7280';
+            ctx.strokeStyle = '#1E2530';
+            ctx.textAlign = 'right';
+            ctx.font = '9px "JetBrains Mono", monospace';
+
+            for (let i = -2; i <= 2; i++) {
+                let val = Math.round(alt / 100) * 100 + (i * 100);
+                if (val < 0) continue;
+                
+                let y = 60 - (val - alt) * scaleFactor;
+                if (y < 5 || y > 115) continue;
+
+                ctx.beginPath();
+                ctx.moveTo(50, y);
+                ctx.lineTo(56, y);
+                ctx.stroke();
+                ctx.fillText(val, 45, y + 3);
+            }
+
+            // Draw center pointer index - flat rectangular indicator box
+            ctx.fillStyle = '#060A0F';
+            ctx.strokeStyle = '#00A8E8';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.rect(5, 48, 80, 24);
+            ctx.fill();
+            ctx.stroke();
+            
+            // Draw small horizontal pointer line
+            ctx.strokeStyle = '#00A8E8';
+            ctx.beginPath();
+            ctx.moveTo(50, 60);
+            ctx.lineTo(65, 60);
+            ctx.stroke();
+        }
+
+        function drawSpeedometer(speed) {
+            const canvas = document.getElementById('airspeedCanvas');
+            const ctx = canvas.getContext('2d');
+            const cx = canvas.width / 2;
+            const cy = canvas.height / 2;
+            const radius = 45;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Outer dial ring - flat line
+            ctx.beginPath();
+            ctx.arc(cx, cy, radius, 0.75 * Math.PI, 2.25 * Math.PI);
+            ctx.strokeStyle = '#1E2530';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            // Tick Marks
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(0.75 * Math.PI);
+            const maxSpeed = 400; // max gauge speed
+            const angleRange = 1.5 * Math.PI;
+
+            for (let val = 0; val <= maxSpeed; val += 20) {
+                let angle = (val / maxSpeed) * angleRange;
+                ctx.save();
+                ctx.rotate(angle);
+                ctx.beginPath();
+                ctx.moveTo(0, -radius);
+                ctx.lineTo(0, -radius + (val % 100 === 0 ? 6 : 3));
+                ctx.strokeStyle = val % 100 === 0 ? '#00A8E8' : '#1E2530';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                
+                if (val % 100 === 0) {
+                    ctx.save();
+                    ctx.translate(0, -radius + 14);
+                    ctx.rotate(-angle - 0.75 * Math.PI); // keep text straight
+                    ctx.fillStyle = '#6B7280';
+                    ctx.font = '8px "JetBrains Mono", monospace';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(val, 0, 0);
+                    ctx.restore();
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+
+            // Draw Pointer Needle - flat aviation blue line, no shadow
+            let targetAngle = 0.75 * Math.PI + (Math.min(speed, maxSpeed) / maxSpeed) * angleRange;
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(targetAngle);
+            ctx.strokeStyle = '#00A8E8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, -radius + 4);
+            ctx.stroke();
+            
+            // Needle center pin - flat solid circle
+            ctx.beginPath();
+            ctx.arc(0, 0, 3, 0, 2 * Math.PI);
+            ctx.fillStyle = '#00A8E8';
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawVSI(vs) {
+            const canvas = document.getElementById('vsiCanvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw vertical scale line
+            ctx.strokeStyle = '#1E2530';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(40, 10);
+            ctx.lineTo(40, 110);
+            ctx.stroke();
+
+            // Draw VS needle offset - flat line indicator
+            ctx.strokeStyle = '#00A8E8';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(40, 60);
+            
+            // Scale: 60 is zero. Maximum +- 4000 FPM corresponding to +-40px
+            let offset = (vs / 4000.0) * 40;
+            offset = Math.max(-40, Math.min(40, offset));
+            ctx.lineTo(40, 60 - offset);
+            ctx.stroke();
+
+            // Draw reference index pointer at center
+            ctx.fillStyle = '#060A0F';
+            ctx.strokeStyle = '#1E2530';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(40, 60);
+            ctx.lineTo(55, 52);
+            ctx.lineTo(55, 68);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Ticks
+            ctx.fillStyle = '#6B7280';
+            ctx.font = '8px "JetBrains Mono", monospace';
+            ctx.textAlign = 'left';
+            ctx.fillText('+2K', 48, 40);
+            ctx.fillText('0', 48, 63);
+            ctx.fillText('-2K', 48, 85);
+        }
+
+        // Run gauge rendering loop
+        function updateGauges() {
+            drawCompass(currentHeading);
+            drawAltimeter(currentAltitude);
+            drawSpeedometer(currentSpeed);
+            drawVSI(currentVS);
+        }
+
+        // Initialize Gauges at 0
+        updateGauges();
+
+        // Switch telemetry tab
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            const activeBtn = event.target;
+            activeBtn.classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        // API Call: Decode position
+        function decodePosition() {
+            const evenMsg = document.getElementById('even-msg').value;
+            const oddMsg = document.getElementById('odd-msg').value;
+
+            fetch('/api/decode_position', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ even_msg: evenMsg, odd_msg: oddMsg })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Decoding Error: ' + data.error);
+                    return;
+                }
+
+                // Update metrics display
+                document.getElementById('val-icao').innerText = '0x' + data.icao_address;
+                document.getElementById('val-pos').innerText = `${data.latitude_even.toFixed(5)}, ${data.longitude_even.toFixed(5)}`;
+                document.getElementById('val-alt').innerText = (data.altitude_even !== null ? data.altitude_even + ' ft' : 'N/A');
+                
+                // Update gauge values
+                currentAltitude = data.altitude_even || 0;
+                updateGauges();
+                
+                document.getElementById('altReadout').innerText = currentAltitude + ' FT';
+
+                // Plot on Leaflet map
+                const posEven = [data.latitude_even, data.longitude_even];
+                const posOdd = [data.latitude_odd, data.longitude_odd];
+
+                if (evenMarker) map.removeLayer(evenMarker);
+                if (oddMarker) map.removeLayer(oddMarker);
+                if (pathLine) map.removeLayer(pathLine);
+
+                evenMarker = L.marker(posEven, { icon: aircraftIcon }).addTo(map)
+                    .bindPopup(`<b>EVEN FRAME</b><br>ICAO: 0x${data.icao_address}<br>ALT: ${data.altitude_even} FT`).openPopup();
+                
+                oddMarker = L.marker(posOdd).addTo(map)
+                    .bindPopup(`<b>ODD FRAME</b><br>ALT: ${data.altitude_odd} FT`);
+
+                pathLine = L.polyline([posEven, posOdd], {
+                    color: '#00A8E8', // Accent color path
+                    weight: 2,
+                    dashArray: '4, 6',
+                    opacity: 0.8
+                }).addTo(map);
+
+                // Re-center map to Even frame position
+                map.setView(posEven, 13);
+            })
+            .catch(err => alert('Network/Server error: ' + err));
+        }
+
+        // API Call: Decode velocity
+        function decodeVelocity() {
+            const velMsg = document.getElementById('vel-msg').value;
+
+            fetch('/api/decode_velocity', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ hex_msg: velMsg })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    alert('Decoding Error: ' + data.error);
+                    return;
+                }
+
+                // Update text readout
+                document.getElementById('val-icao').innerText = '0x' + data.icao_address;
+                document.getElementById('val-speed').innerText = `${data.speed.toFixed(1)} KT (${data.speed_type.toUpperCase()})`;
+                document.getElementById('val-heading').innerText = (data.heading !== null ? data.heading.toFixed(1) + '°' : 'N/A');
+                document.getElementById('val-vs').innerText = (data.vertical_rate !== null ? data.vertical_rate + ' FT/MIN' : 'N/A');
+                document.getElementById('val-diff').innerText = (data.altitude_difference !== null ? data.altitude_difference + ' FT' : 'N/A');
+
+                // Update gauge values
+                currentHeading = data.heading || 0;
+                currentSpeed = data.speed || 0;
+                currentVS = data.vertical_rate || 0;
+                updateGauges();
+
+                // Rotate Compass and Speed readouts
+                document.getElementById('compassReadout').innerText = Math.round(currentHeading) + '°';
+                document.getElementById('speedReadout').innerText = Math.round(currentSpeed) + ' KT';
+                document.getElementById('vsReadout').innerText = currentVS + ' FPM';
+
+                // Rotate the plane icon on the map if marker exists (instantly, no transitions)
+                const planeSvg = document.getElementById('plane-svg');
+                if (planeSvg) {
+                    planeSvg.style.transform = `rotate(${currentHeading}deg)`;
+                }
+            })
+            .catch(err => alert('Network/Server error: ' + err));
+        }
+    </script>
+</body>
+</html>
