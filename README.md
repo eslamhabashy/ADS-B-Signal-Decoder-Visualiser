@@ -24,18 +24,50 @@ Compared to Secondary Surveillance Radar (SSR), which relies on a rotating anten
 
 ---
 
-## 2. Decoder Architecture & Capabilities
+## 2. System Architecture
 
-This project is structured into two main layers: a binary message parser and a geometric state decoder.
+This toolkit covers the **complete end-to-end ADS-B signal chain** — from synthesising a physically accurate Mode S RF waveform all the way through demodulation, parsing, and interactive telemetry visualisation.
+
+```mermaid
+flowchart TD
+    A(["🛩  ADS-B Hex Message\n e.g. 8D75804B580FF2CF..."])
+    B["Bit Encoder\n hex_to_bits()"]
+    C["PPM Waveform Generator\n generate_ppm_waveform()\n 8 µs preamble · 1 Mbit/s · 20 Msps"]
+    D["IQ / Baseband Simulation\n to_iq_signal()\n I = s·cos(2πf·t) · Q = s·sin(2πf·t)"]
+    E["Noise Channel — AWGN\n add_awgn_noise()\n Configurable SNR in dB"]
+    F["Demodulator\n demodulate_ppm()\n Matched-filter energy decision · BER metric"]
+    G["Parser — parser_adsb.py\n CRC · DF · ICAO · Type Code"]
+    H["Decoder — decoder.py\n CPR Position · Altitude · Velocity"]
+    I(["🗺  Visualiser — visualiser.py / index.html\n Live map · Gauges · Telemetry dashboard"])
+
+    A --> B --> C --> D --> E --> F --> G --> H --> I
+
+    style A fill:#0F1923,stroke:#00A8E8,color:#D4D8DD
+    style B fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style C fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style D fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style E fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style F fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style G fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style H fill:#0F1923,stroke:#1E2530,color:#D4D8DD
+    style I fill:#0F1923,stroke:#00A8E8,color:#D4D8DD
+```
+
+### Repository Structure
 
 ```
 .
-├── parser_adsb.py       # Mode S packet validation and bit slicing
-├── decoder.py           # Coordinate reconstruction (CPR), altitude, and velocity decoding
-├── waveform.py          # PPM waveform generation, IQ simulation, AWGN channel, demodulation
-├── test_parser.py       # Unit tests — packet slicing and CRC validation
+├── waveform.py          # Layers 1–5: PPM encoding, IQ, AWGN, demodulation, BER, plotting
+├── parser_adsb.py       # Layer 6: Mode S packet validation and bit slicing
+├── decoder.py           # Layer 7: CPR position, altitude, and velocity decoding
+├── visualiser.py        # Layer 8: Local web server serving the dashboard
+├── index.html           # Interactive telemetry and map dashboard (Leaflet.js)
+├── api/                 # Vercel serverless functions (decode_position, decode_velocity)
+├── test_waveform.py     # Unit tests — waveform layers (27 test cases)
+├── test_parser.py       # Unit tests — CRC validation and packet slicing
 ├── test_decoder.py      # Unit tests — CPR, altitude, and velocity math
-└── test_waveform.py     # Unit tests — waveform layers (27 test cases)
+├── requirements.txt     # numpy · matplotlib · scipy
+└── .gitignore
 ```
 
 ### A. Packet Parsing ([parser_adsb.py](parser_adsb.py))
@@ -176,3 +208,33 @@ Decoding Subtype 3 (Airspeed):
   - E-W component:      0.00 knots
   - N-S component:      -300.00 knots
 ```
+
+---
+
+## 5. Future Work & SDR Roadmap
+
+This toolkit is designed as a foundation for real-world Software Defined Radio (SDR) integration. Planned extensions include:
+
+### Signal Reception & Hardware Integration
+
+- **RTL-SDR / HackRF support** — pipe raw IQ samples directly from a USB SDR dongle into the demodulator pipeline
+- **GNU Radio flowgraph** — export the PPM demodulation chain as a GNU Radio companion block for real-time processing
+- **Real-time ADS-B capture** — replace simulated AWGN with live 1090 MHz captures for ground station experimentation
+
+### Signal Processing Improvements
+
+- **Frame synchronisation** — implement preamble correlation (matched filter bank) to detect message boundaries in a continuous IQ stream
+- **Adaptive noise estimation** — replace fixed-threshold demodulation with an adaptive SNR estimator using a sliding noise floor estimate
+- **Multipath / Doppler modelling** — extend the channel simulator with frequency offset and multipath fading models relevant to low-altitude ADS-B reception
+- **Forward Error Correction experiments** — explore adding Reed-Solomon or LDPC outer codes for BER improvement below the Mode S CRC floor
+
+### Expanded Decoding
+
+- **DF 0 / DF 4 / DF 5 short squitter** — extend `parser_adsb.py` to handle 56-bit surveillance replies
+- **MLAT (Multilateration)** — add time-difference-of-arrival positioning from multiple ground receivers
+- **ADS-B Out simulation** — generate syntactically valid transponder broadcasts for avionics test-bench use
+
+### Integration & Deployment
+
+- **Streaming dashboard** — replace the manual hex-input interface with a live WebSocket feed from a running SDR receiver
+- **REST API** — expose the full decode pipeline as a JSON endpoint (FastAPI) for integration with existing ATC displays
