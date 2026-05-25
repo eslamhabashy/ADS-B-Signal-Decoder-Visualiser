@@ -2,6 +2,10 @@
 
 A high-fidelity Python implementation for parsing and decoding 1090 MHz Mode S Extended Squitter (ADS-B) messages. This repository contains modules for CRC validation, spatial decoding using the Compact Position Reporting (CPR) algorithm, and vector velocity decomposition.
 
+![ADS-B Visualiser Dashboard](screenshot.png)
+
+*Interactive flight telemetry and map dashboard decoding real-time transponder signals.*
+
 ---
 
 ## 1. What is ADS-B and Why It Matters
@@ -23,14 +27,14 @@ Compared to Secondary Surveillance Radar (SSR), which relies on a rotating anten
 This project is structured into two main layers: a binary message parser and a geometric state decoder.
 
 ```
-/Users/mac/Desktop/DLR INTERNSHIP/
+.
 ├── parser_adsb.py       # Mode S packet validation and bit slicing
 ├── decoder.py           # Coordinate reconstruction (CPR), altitude, and velocity decoding
 ├── test_parser.py       # Unit tests for packet slicing and CRC checks
 └── test_decoder.py      # Unit tests for CPR, altitude, and velocity math
 ```
 
-### A. Packet Parsing ([parser_adsb.py](file:///Users/mac/Desktop/DLR%20INTERNSHIP/parser_adsb.py))
+### A. Packet Parsing ([parser_adsb.py](parser_adsb.py))
 This module extracts low-level fields from the 112-bit Extended Squitter frame:
 * **Downlink Format (DF) Slicing:** Extracts bits 1-5 to identify the protocol format (typically DF 17 or DF 18).
 * **ICAO Address Extraction:** Slices bits 9-32 representing the unique 24-bit aircraft transponder address.
@@ -39,7 +43,7 @@ This module extracts low-level fields from the 112-bit Extended Squitter frame:
   $$G(x) = x^{24} + x^{23} + x^{22} + x^{21} + x^{20} + x^{19} + x^{18} + x^{16} + x^{14} + x^{13} + x^{12} + x^{11} + x^{10} + x^3 + x^1 + 1$$
   *(Represented in hex as `0xFFF409` or `0x1FFF409` including the leading coefficient).*
 
-### B. State Decoding ([decoder.py](file:///Users/mac/Desktop/DLR%20INTERNSHIP/decoder.py))
+### B. State Decoding ([decoder.py](decoder.py))
 This module handles spatial and physical reconstruction of the telemetry:
 
 * **Compact Position Reporting (CPR) Decoding:** Slices the 34 bits (17 bits for latitude, 17 bits for longitude) allocated in Airborne Position messages (TC 9-18).
@@ -79,9 +83,19 @@ python3 test_decoder.py
 python3 test_parser.py
 ```
 
+### Launch the Visualisation Dashboard
+To run the interactive web interface, navigate to the project directory and run:
+```bash
+python3 visualiser.py
+```
+Then open [http://localhost:8080](http://localhost:8080) in your web browser.
+
 ---
 
 ## 4. Verification & Example Outputs
+
+### Web Visualiser Dashboard in Action
+![ADS-B Visualiser Demo](demo.gif)
 
 ### CPR Position Decoder Output
 When running position decoding on a pair of Even/Odd messages from Cebu Pacific Air flight **RP-C3191** (Airbus A319):
