@@ -30,7 +30,7 @@ This toolkit covers the **complete end-to-end ADS-B signal chain** — from synt
 
 ```mermaid
 flowchart TD
-    A(["🛩  ADS-B Hex Message\n e.g. 8D75804B580FF2CF..."])
+    A(["ADS-B Hex Message\n e.g. 8D75804B580FF2CF..."])
     B["Bit Encoder\n hex_to_bits()"]
     C["PPM Waveform Generator\n generate_ppm_waveform()\n 8 µs preamble · 1 Mbit/s · 20 Msps"]
     D["IQ / Baseband Simulation\n to_iq_signal()\n I = s·cos(2πf·t) · Q = s·sin(2πf·t)"]
@@ -167,6 +167,11 @@ Then open [http://localhost:8080](http://localhost:8080) in your web browser.
 
 ### Web Visualiser Dashboard in Action
 ![ADS-B Visualiser Demo](demo.gif)
+
+### Waveform Generator Analysis Output
+![Simulated Waveform Analysis](waveform_analysis.png)
+
+*A 4-panel signal analysis plot showing the clean PPM baseband waveform, noise simulation under a 10 dB AWGN channel, baseband I/Q components upconverted to a 1 MHz intermediate frequency, and the Power Spectral Density (PSD) showing the signal's energy distribution.*
 
 ### CPR Position Decoder Output
 When running position decoding on a pair of Even/Odd messages from Cebu Pacific Air flight **RP-C3191** (Airbus A319):
