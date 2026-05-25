@@ -1,0 +1,16 @@
+# Runtime dependencies for ADS-B Decoder, Visualiser & Waveform Simulation Toolkit
+#
+# Core waveform simulation (waveform.py):
+numpy
+matplotlib
+scipy      # Optional: provides scipy.signal.welch for PSD estimation
+           # The module falls back to numpy FFT if scipy is unavailable.
+#
+# The parser, decoder, and web visualiser modules (parser_adsb.py, decoder.py,
+# visualiser.py) run entirely on the Python Standard Library — no additional
+# packages are needed for those components.
+#
+# Installation:
+#   pip install -r requirements.txt
+#
+# Recommended Python version: 3.8+

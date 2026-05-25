@@ -1,6 +1,6 @@
-# Mode S ADS-B Message Parser & CPR/Velocity Decoder
+# ADS-B Decoder, Visualiser & Waveform Simulation Toolkit
 
-A high-fidelity Python implementation for parsing and decoding 1090 MHz Mode S Extended Squitter (ADS-B) messages. This repository contains modules for CRC validation, spatial decoding using the Compact Position Reporting (CPR) algorithm, and vector velocity decomposition.
+A high-fidelity Python toolkit for parsing, decoding, and simulating 1090 MHz Mode S Extended Squitter (ADS-B) transmissions. This repository covers the complete ADS-B signal chain — from CRC validation and CPR position reconstruction to Pulse Position Modulation (PPM) waveform generation, IQ baseband simulation, and AWGN channel modelling.
 
 ### [**Live Visualiser Demo**](https://ads-b-signal-decoder-visualiser.vercel.app/)
 
@@ -32,8 +32,10 @@ This project is structured into two main layers: a binary message parser and a g
 .
 ├── parser_adsb.py       # Mode S packet validation and bit slicing
 ├── decoder.py           # Coordinate reconstruction (CPR), altitude, and velocity decoding
-├── test_parser.py       # Unit tests for packet slicing and CRC checks
-└── test_decoder.py      # Unit tests for CPR, altitude, and velocity math
+├── waveform.py          # PPM waveform generation, IQ simulation, AWGN channel, demodulation
+├── test_parser.py       # Unit tests — packet slicing and CRC validation
+├── test_decoder.py      # Unit tests — CPR, altitude, and velocity math
+└── test_waveform.py     # Unit tests — waveform layers (27 test cases)
 ```
 
 ### A. Packet Parsing ([parser_adsb.py](parser_adsb.py))
@@ -59,9 +61,32 @@ This module handles spatial and physical reconstruction of the telemetry:
   * **Airspeed (Subtypes 3 & 4):** Extracts heading and Indicated Airspeed (IAS) or True Airspeed (TAS) directly.
   * **Vertical Rate:** Extracts climb/descent speed ($64 \text{ ft/min}$ resolution) and vertical source (Barometric vs. GNSS).
 
+### C. Waveform Simulation ([waveform.py](waveform.py))
+This module simulates the physical Mode S signal chain from bits to baseband:
+
+* **PPM Encoding:** Generates a Mode S-compliant preamble (4 pulses at 0, 1, 3.5, 4.5 µs) and encodes each data bit as a 1 µs Manchester-style PPM symbol (0.5 µs pulse-first for `1`, pulse-second for `0`).
+* **IQ Baseband Upconversion:** Multiplies the real PPM envelope by a configurable IF carrier, producing `I(t)` and `Q(t)` components for SDR compatibility analysis.
+* **AWGN Channel Simulation:** Adds Additive White Gaussian Noise at a configurable SNR (dB), computed from signal power to produce statistically correct noise variance.
+* **Threshold Demodulation:** Recovers bit estimates from noisy waveforms using a per-bit energy comparison between the two 0.5 µs half-periods (matched filter decision).
+* **BER Analysis:** Computes the Bit Error Rate between original and decoded bit arrays across SNR levels.
+* **4-Panel Waveform Plot:** Generates a professional dark-theme matplotlib figure showing:
+  1. Clean PPM baseband waveform with annotated preamble region
+  2. AWGN-noisy waveform overlaid with BER readout
+  3. IQ (I/Q component) signal at the configured IF
+  4. Power Spectral Density (FFT magnitude spectrum)
+
+| Signal Parameter   | Value                                              |
+|--------------------|----------------------------------------------------|
+| Modulation         | PPM (Pulse Position Modulation)                    |
+| Bit rate           | 1 Mbit/s (1 µs per bit)                           |
+| Pulse width        | 0.5 µs                                             |
+| Preamble           | 8 µs — pulses at 0, 1, 3.5, 4.5 µs               |
+| Data length        | 56 bits (short) or 112 bits (Extended Squitter)    |
+| Default sample rate| 20 Msps (20 samples per µs)                        |
+
 ---
 
-## 3. How to Run the Decoder and Tests
+## 3. How to Run the Toolkit
 
 ### Run the Demonstrations
 Execute the main decoder module to parse sample transponder signals:
@@ -76,13 +101,25 @@ python3 parser_adsb.py 8D4840D6202CC371C32CE0576098
 ```
 
 ### Run the Automated Unit Test Suites
-Execute the test suites to run mathematical validations against edge cases:
+Execute the full test suite (40 tests across parser, decoder, and waveform modules):
 ```bash
-# Run CPR position, altitude, and velocity tests
-python3 test_decoder.py
+# Run all tests together
+python3 -m unittest test_parser.py test_decoder.py test_waveform.py -v
 
-# Run CRC and packet parser tests
-python3 test_parser.py
+# Or run individual suites
+python3 test_decoder.py      # CPR position, altitude, velocity
+python3 test_parser.py       # CRC and packet slicing
+python3 test_waveform.py     # PPM encoding, IQ, AWGN, demodulation
+```
+
+### Launch the Waveform Simulator
+Generate a 4-panel waveform analysis plot for any hex message:
+```bash
+# Default test message (Cebu Pacific Air RP-C3191)
+python3 waveform.py
+
+# Custom message with noise simulation at 10 dB SNR
+python3 waveform.py 8D4840D6202CC371C32CE0576098 10
 ```
 
 ### Launch the Visualisation Dashboard
