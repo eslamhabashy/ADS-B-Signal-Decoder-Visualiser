@@ -435,7 +435,6 @@ def plot_waveform(
         color="#D4D8DD",
         y=0.98,
         fontfamily="monospace",
-        letter_spacing=0.05,
     )
 
     gs = gridspec.GridSpec(n_panels, 1, figure=fig, hspace=0.55, top=0.93, bottom=0.06)
