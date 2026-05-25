@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import unittest
-from parser import clean_message, validate_crc, extract_df, extract_icao, extract_type_code, parse_adsb_message
+from parser_adsb import clean_message, validate_crc, extract_df, extract_icao, extract_type_code, parse_adsb_message
 
 
 class TestADSBParser(unittest.TestCase):
@@ -34,9 +34,6 @@ class TestADSBParser(unittest.TestCase):
         self.assertEqual(extract_df(self.sample_msg), 17)
         self.assertEqual(extract_df(self.wrapped_msg), 17)
         
-        # Test custom message: DF is determined by first 5 bits of first byte.
-        # 0x00 has first byte 00000000 -> DF 0
-        # 0xF0 has first byte 11110000 -> DF 30
         self.assertEqual(extract_df("00" + "0" * 26), 0)
         self.assertEqual(extract_df("F0" + "0" * 26), 30)
 
@@ -48,8 +45,6 @@ class TestADSBParser(unittest.TestCase):
         self.assertEqual(extract_type_code(self.sample_msg), 4)
         self.assertEqual(extract_type_code(self.wrapped_msg), 4)
         
-        # Non-Extended Squitter DF should raise ValueError (e.g., DF 11 message)
-        # Message beginning with '5D' -> DF 11 (01011101 -> 01011 = 11)
         df_11_msg = "5D4840D6202CC371C32CE0576098"
         with self.assertRaises(ValueError):
             extract_type_code(df_11_msg)
