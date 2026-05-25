@@ -23,7 +23,9 @@ def clean_message(hex_msg: str) -> str:
     """
     cleaned = hex_msg.strip().replace("*", "").replace(";", "").upper()
     if not re.match(r"^[0-9A-F]+$", cleaned):
-        raise ValueError(f"Invalid characters in message: '{hex_msg}'. Hexadecimal expected.")
+        raise ValueError(
+            f"Invalid characters in message: '{hex_msg}'. Hexadecimal expected."
+        )
     return cleaned
 
 
@@ -33,11 +35,13 @@ def validate_crc(hex_msg: str) -> bool:
     """
     cleaned = clean_message(hex_msg)
     if len(cleaned) != 28:
-        raise ValueError(f"Invalid message length: {len(cleaned)} hex characters. Expected 28 (112 bits).")
-        
+        raise ValueError(
+            f"Invalid message length: {len(cleaned)} hex characters. Expected 28 (112 bits)."
+        )
+
     msg_bytes = bytes.fromhex(cleaned)
     rem = 0
-    
+
     for byte in msg_bytes:
         for bit_idx in range(7, -1, -1):
             bit = (byte >> bit_idx) & 1
@@ -45,7 +49,7 @@ def validate_crc(hex_msg: str) -> bool:
             rem = ((rem << 1) | bit) & 0xFFFFFF
             if msb_set:
                 rem ^= MODE_S_POLY
-                
+
     return rem == 0
 
 
@@ -76,13 +80,13 @@ def extract_type_code(hex_msg: str) -> int:
     cleaned = clean_message(hex_msg)
     if len(cleaned) < 10:
         raise ValueError("Message is too short to extract Type Code.")
-        
+
     df = extract_df(cleaned)
     if df not in (17, 18):
         raise ValueError(
             f"Downlink Format {df} does not contain a standard Extended Squitter ME field (expected DF 17 or 18)."
         )
-        
+
     msg_bytes = bytes.fromhex(cleaned)
     type_code = msg_bytes[4] >> 3
     return type_code
@@ -93,40 +97,44 @@ def parse_adsb_message(hex_msg: str) -> Dict[str, Any]:
     Convenience function that parses all required fields and validates the CRC checksum.
     """
     cleaned = clean_message(hex_msg)
-    
+
     df = extract_df(cleaned)
     icao = extract_icao(cleaned)
     crc_valid = validate_crc(cleaned)
-    
+
     type_code = None
     if df in (17, 18):
         type_code = extract_type_code(cleaned)
-        
+
     return {
         "raw_message": cleaned,
         "downlink_format": df,
         "icao_address": icao,
         "type_code": type_code,
-        "crc_valid": crc_valid
+        "crc_valid": crc_valid,
     }
 
 
 if __name__ == "__main__":
     default_msg = "8D4840D6202CC371C32CE0576098"
     input_msg = sys.argv[1] if len(sys.argv) > 1 else default_msg
-    
+
     print("-" * 50)
     print("ADS-B MESSAGE PARSER DEMO")
     print("-" * 50)
     print(f"Parsing Input Message: {input_msg}")
-    
+
     try:
         results = parse_adsb_message(input_msg)
         print(f"  - Cleaned Message:   {results['raw_message']}")
-        print(f"  - CRC Checksum Valid: {results['crc_valid']} {'(PASSED)' if results['crc_valid'] else '(FAILED)'}")
-        print(f"  - Downlink Format:   {results['downlink_format']} (DF{results['downlink_format']})")
+        print(
+            f"  - CRC Checksum Valid: {results['crc_valid']} {'(PASSED)' if results['crc_valid'] else '(FAILED)'}"
+        )
+        print(
+            f"  - Downlink Format:   {results['downlink_format']} (DF{results['downlink_format']})"
+        )
         print(f"  - ICAO Address:      0x{results['icao_address']}")
-        if results['type_code'] is not None:
+        if results["type_code"] is not None:
             print(f"  - ME Type Code:      {results['type_code']}")
         else:
             print("  - ME Type Code:      N/A (Not an Extended Squitter)")

@@ -21,8 +21,9 @@ from decoder import decode_airborne_position, decode_airborne_velocity
 
 PORT = 8080
 
+
 class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
-    
+
     def log_message(self, format: str, *args: Any) -> None:
         # Override to suppress console spam from HTTP requests
         pass
@@ -30,7 +31,9 @@ class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         if self.path == "/" or self.path == "/index.html":
             try:
-                html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "index.html")
+                html_path = os.path.join(
+                    os.path.dirname(os.path.abspath(__file__)), "index.html"
+                )
                 with open(html_path, "r", encoding="utf-8") as f:
                     content = f.read()
                 self.send_response(200)
@@ -48,7 +51,7 @@ class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         content_length = int(self.headers.get("Content-Length", 0))
         post_data = self.rfile.read(content_length)
-        
+
         try:
             params = json.loads(post_data.decode("utf-8"))
         except Exception:
@@ -66,11 +69,11 @@ class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
     def handle_decode_position(self, params: Dict[str, Any]) -> None:
         even_msg = params.get("even_msg", "")
         odd_msg = params.get("odd_msg", "")
-        
+
         if not even_msg or not odd_msg:
             self.send_error_response("Both Even and Odd messages are required.")
             return
-            
+
         try:
             res = decode_airborne_position(even_msg, odd_msg)
             self.send_success_response(res)
@@ -79,11 +82,11 @@ class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
 
     def handle_decode_velocity(self, params: Dict[str, Any]) -> None:
         hex_msg = params.get("hex_msg", "")
-        
+
         if not hex_msg:
             self.send_error_response("Velocity hex message is required.")
             return
-            
+
         try:
             res = decode_airborne_velocity(hex_msg)
             self.send_success_response(res)
@@ -106,16 +109,16 @@ class ADSBVisualiserHTTPHandler(http.server.BaseHTTPRequestHandler):
 def start_server() -> None:
     handler = ADSBVisualiserHTTPHandler
     socketserver.TCPServer.allow_reuse_address = True
-    
+
     with socketserver.TCPServer(("", PORT), handler) as httpd:
         print("-" * 65)
         print(f"ADS-B Visualiser Server launched locally on: http://localhost:{PORT}")
         print("Press Ctrl+C to terminate.")
         print("-" * 65)
-        
+
         # Open default browser automatically
         webbrowser.open(f"http://localhost:{PORT}")
-        
+
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

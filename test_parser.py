@@ -1,10 +1,17 @@
 #!/usr/bin/env python3
 import unittest
-from parser_adsb import clean_message, validate_crc, extract_df, extract_icao, extract_type_code, parse_adsb_message
+from parser_adsb import (
+    clean_message,
+    validate_crc,
+    extract_df,
+    extract_icao,
+    extract_type_code,
+    parse_adsb_message,
+)
 
 
 class TestADSBParser(unittest.TestCase):
-    
+
     def setUp(self):
         # The standard sample message from the prompt
         self.sample_msg = "8D4840D6202CC371C32CE0576098"
@@ -15,9 +22,14 @@ class TestADSBParser(unittest.TestCase):
 
     def test_clean_message(self):
         self.assertEqual(clean_message(self.sample_msg), "8D4840D6202CC371C32CE0576098")
-        self.assertEqual(clean_message(self.wrapped_msg), "8D4840D6202CC371C32CE0576098")
-        self.assertEqual(clean_message("  *8d4840d6202cc371c32ce0576098;  "), "8D4840D6202CC371C32CE0576098")
-        
+        self.assertEqual(
+            clean_message(self.wrapped_msg), "8D4840D6202CC371C32CE0576098"
+        )
+        self.assertEqual(
+            clean_message("  *8d4840d6202cc371c32ce0576098;  "),
+            "8D4840D6202CC371C32CE0576098",
+        )
+
         with self.assertRaises(ValueError):
             clean_message("8D4840D6202CC371C32CE057609G")  # 'G' is not valid hex
 
@@ -25,7 +37,7 @@ class TestADSBParser(unittest.TestCase):
         self.assertTrue(validate_crc(self.sample_msg))
         self.assertTrue(validate_crc(self.wrapped_msg))
         self.assertFalse(validate_crc(self.corrupted_msg))
-        
+
         # Test length validation
         with self.assertRaises(ValueError):
             validate_crc("8D4840D")  # Too short
@@ -33,7 +45,7 @@ class TestADSBParser(unittest.TestCase):
     def test_extract_df(self):
         self.assertEqual(extract_df(self.sample_msg), 17)
         self.assertEqual(extract_df(self.wrapped_msg), 17)
-        
+
         self.assertEqual(extract_df("00" + "0" * 26), 0)
         self.assertEqual(extract_df("F0" + "0" * 26), 30)
 
@@ -44,7 +56,7 @@ class TestADSBParser(unittest.TestCase):
     def test_extract_type_code(self):
         self.assertEqual(extract_type_code(self.sample_msg), 4)
         self.assertEqual(extract_type_code(self.wrapped_msg), 4)
-        
+
         df_11_msg = "5D4840D6202CC371C32CE0576098"
         with self.assertRaises(ValueError):
             extract_type_code(df_11_msg)
